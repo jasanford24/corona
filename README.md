@@ -3,7 +3,7 @@ Corona Virus SMS System for my Raspberry Pi 4B
 
 
 
-Requires Twilio account and additional files:
+Requires Twilio account and additional pickle files:
 
 <pre><code>death.p       -   Int of prior death count
 numbers.p     -   Dictionary of numbers with local state {'+phone number' : 'State'}
