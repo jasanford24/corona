@@ -1,6 +1,8 @@
 # corona
 Corona Virus SMS System for my Raspberry Pi 4B
 
+Checks the New York Times website for Covid-19 data every 30 minutes and\
+sends out a text whenever the total number of deaths within the US increases.
 
 
 Requires Twilio account and additional pickle files:
