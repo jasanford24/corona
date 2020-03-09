@@ -7,5 +7,5 @@ Requires Twilio account and additional files:
 
 <pre><code>death.p       -   Int of prior death count
 numbers.p     -   Dictionary of numbers with local state {'+phone number' : 'State'}
-logiin.p      -   List of Twilio login credentials with my personal number on the end.</code></pre>
+login.p      -   List of Twilio login credentials with my personal number on the end.</code></pre>
    
