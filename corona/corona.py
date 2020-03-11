@@ -78,7 +78,10 @@ def main():
             message = twilioCli.messages.create(body=message,
                                                 from_=logins[2],
                                                 to=k)
-        save(corona_value)
+        
+        # Saves updated total death count
+        with open('death.p', 'wb') as file:
+            dump(corona_value, file)
 
 
 # If an error occurs during data collection.
@@ -101,12 +104,6 @@ def emergency():
 def past():
     with open('death.p', 'rb') as pfile:
         return load(pfile)
-
-
-# Saves updated total death count
-def save(integers):
-    with open('death.p', 'wb') as pfile:
-        dump(integers, pfile)
 
 
 # Loads API data
