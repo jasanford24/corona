@@ -70,15 +70,10 @@ def main():
                     state_case = x[1]
                     state_death = x[2]
 
-            # Provides alternate message if home state has the most confirmed cases.
-            if numbers[k] == state_df[0][0]:
-                message = 'The total number of deaths in the United States from the corona virus is now ' + \
-                    str(corona_value) + " with " + numbers[k] + " having the most confirmed cases at " + state_case + " and " + state_death +\
-                    " deaths."
-            else:
-                message = 'The total number of deaths in the United States from the corona virus is now ' + \
-                    str(corona_value) + " with " + numbers[k] + " having " + state_case + " confirmed cases and " + state_death +\
-                    " deaths."
+            message = 'Total U.S. Covid-19 death count is now ' + \
+                        str(corona_value) + " with " + numbers[k] + " having " + \
+                        state_case + " confirmed cases and " + state_death +\
+                        " deaths."
 
             message = twilioCli.messages.create(body=message,
                                                 from_=logins[2],
