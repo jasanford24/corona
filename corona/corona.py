@@ -54,7 +54,10 @@ def main():
     # If total number is greater than previous total, send updated text.
     if corona_value > past():
         logins = login()
-        numbers = numbas()
+
+        # Load {phone_number:state} data from pickle
+        with open('numbers.p', 'rb') as pfile:
+            numbers = load(pfile)
 
         twilioCli = Client(logins[0], logins[1])
 
@@ -114,12 +117,6 @@ def save(integers):
 # Loads API data
 def login():
     with open('login.p', 'rb') as pfile:
-        return load(pfile)
-
-
-# Loads dictionary of phone numbers and states
-def numbas():
-    with open('numbers.p', 'rb') as pfile:
         return load(pfile)
 
 
