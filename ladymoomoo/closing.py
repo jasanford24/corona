@@ -45,11 +45,14 @@ def fix_input(inp):
 
 
 def add_to_numbers():
-    with open('numbers.p', 'rb') as pfile:
-        numbers = load(pfile)
+    try:
+        with open('numbers.p', 'rb') as pfile:
+            numbers = load(pfile)
+    except FileNotFoundError:
+        numbers = []
 
     numbers.append(input_set(test))
-
+    
     with open('numbers.p', 'wb') as p:
         dump(numbers, p)
 
@@ -59,9 +62,9 @@ def remove_from_numbers():
         numbers = load(pfile)
     
     number_to_be_removed = input("Enter 10-digit phone number to be removed: ")
-
+    
     numbers = [x for x in numbers if x.split('@')[0] != number_to_be_removed]
-
+    
     with open('numbers.p', 'wb') as p:
         dump(numbers, p)
 
