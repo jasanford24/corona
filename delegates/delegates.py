@@ -15,8 +15,8 @@ def bernie_delegates():
     options = Options()
     options.add_argument("--headless")
     options.add_argument("--incognito")
-    options.binary_location = '/Applications/Brave Browser.app/Contents/MacOS/Brave Browser'
-    driver_path = '/Users/noumenari/Documents/Python Projects/chromedriver'
+    options.binary_location = '/path_to/Brave Browser'
+    driver_path = '/path_to/chromedriver'
     browser = webdriver.Chrome(options=options, executable_path=driver_path)
 
     browser.get(
