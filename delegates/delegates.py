@@ -1,4 +1,5 @@
-from datetime import datetime
+from datetime import datetime, timedelta
+from pickle import load
 from time import sleep
 
 from pyperclip import copy
@@ -28,22 +29,21 @@ def bernie_delegates():
     return int(test)
 
 
-# Load previously collected date/delegate data
-def load_data():
-    from pickle import load
-    with open('delegate.p', 'rb') as pfile:
-        return load(pfile)
-
-
 if __name__ == "__main__":
     # Load datetime, date delegate totals
-    del_df = load_data()
+    with open('delegate.p', 'rb') as pfile:
+        del_df = load(pfile)
 
     # Webscrape Bernie's current delegate count
     bernie_count = bernie_delegates()
 
     # Calculate remaining number of available delegates
-    remaining = sum(del_df[del_df.datetime > datetime.today()]['delegates'])
+    if datetime.today().hour > 19:
+        remaining = sum(
+            del_df[del_df.datetime > datetime.today()]['delegates'])
+    else:
+        remaining = sum(del_df[del_df.datetime > datetime.today() -
+                               timedelta(days=1)]['delegates'])
 
     # Calculate percentage of remaining delegates needed for Bernie to reach 1991
     delegate_percent = round((1991 - bernie_count) / remaining, 3)
