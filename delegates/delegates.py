@@ -1,8 +1,9 @@
+# Pi 4B Version
+
 from datetime import datetime, timedelta
 from pickle import load
 from time import sleep
 
-from pyperclip import copy
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 
@@ -15,8 +16,8 @@ def bernie_delegates():
     options = Options()
     options.add_argument("--headless")
     options.add_argument("--incognito")
-    options.binary_location = '/path_to/Brave Browser'
-    driver_path = '/path_to/chromedriver'
+    options.binary_location = '/usr/bin/chromium-browser'
+    driver_path = 'chromedriver'
     browser = webdriver.Chrome(options=options, executable_path=driver_path)
 
     browser.get(
@@ -52,8 +53,5 @@ if __name__ == "__main__":
     answer = '(1991-' + str(bernie_count) + ')/' + \
         str(remaining) + ' = ' + str(delegate_percent) + \
         ' = ' + str(round(delegate_percent*100, 1)) + '% needed'
-
-    # For easily sharing results with friends
-    copy(answer)
 
     print(answer)
