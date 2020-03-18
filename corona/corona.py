@@ -8,6 +8,7 @@ from selenium.webdriver.chrome.options import Options
 from twilio.rest import Client
 
 
+
 # Collected data from NY Times website
 def state_count():
     options = Options()
@@ -19,7 +20,7 @@ def state_count():
     drvr.get(
         'https://www.nytimes.com/interactive/2020/us/coronavirus-us-cases.html'
     )
-
+    
     # Clicks "Show More" button to show all states
     element = drvr.find_element_by_xpath(
         '//*[@id="coronavirus-us-cases"]/div/div/div[3]/div/button')
@@ -40,48 +41,63 @@ def state_count():
 
 
 # Main function that collects the data and sends personalized data to each phone number
-def main():
+def main(update_count):
+    
+    # Resets update count for each day
+    if localtime()[3] < 10 and update_count!=0:
+        update_count = 0
+    
+    # If after 10am, attempt update. If updated, don't attempt to update again until after 8pm
+    if (localtime()[3] > 9 and update_count==0) or (localtime()[3] > 19 and update_count==1):
+    
+        # Catches any errors that may occur during collection
+        try:
+            state_df = state_count()
+        except:
+            emergency()
 
-    # Catches any errors that may occur during collection
-    try:
-        state_df = state_count()
-    except:
-        emergency()
+        # Total number of deaths in the US
+        corona_value = sum([int(x[2].replace(',', '')) for x in state_df])
 
-    # Total number of deaths in the US
-    corona_value = sum([int(x[2]) for x in state_df])
+        # If total number is greater than previous total, send updated text.
+        if corona_value > past():
 
-    # If total number is greater than previous total, send updated text.
-    if corona_value > past():
-        logins = login()
+            logins = login()
+            twilioCli = Client(logins[0], logins[1])
 
-        # Load {phone_number:state} data from pickle
-        with open('numbers.p', 'rb') as pfile:
-            numbers = load(pfile)
+            # Load {phone_number:state} data from pickle
+            with open('numbers.p', 'rb') as pfile:
+                numbers = load(pfile)
 
-        twilioCli = Client(logins[0], logins[1])
 
-        for k in numbers:
-            state_case = '0'
-            state_death = '0'
+            for k in numbers:
+                state_case = '0'
+                state_death = '0'
 
-            for x in state_df:
-                if numbers[k] == x[0]:
-                    state_case = x[1]
-                    state_death = x[2]
+                for x in state_df:
+                    if numbers[k] == x[0]:
+                        state_case = x[1]
+                        state_death = x[2]
 
-            message = 'Total U.S. Covid-19 death count is now ' + \
-                        str(corona_value) + " with " + numbers[k] + " having " + \
-                        state_case + " confirmed cases and " + state_death +\
-                        " deaths."
+                message = 'Total U.S. Covid-19 death count is now ' + \
+                            str(corona_value) + " with " + numbers[k] + " having " + \
+                            state_case + " confirmed cases and " + state_death +\
+                            " deaths."
 
-            message = twilioCli.messages.create(body=message,
-                                                from_=logins[2],
-                                                to=k)
-        
-        # Saves updated total death count
-        with open('death.p', 'wb') as file:
-            dump(corona_value, file)
+                message = twilioCli.messages.create(body=message,
+                                                    from_=logins[2],
+                                                    to=k)
+            update_count += 1
+            # Saves updated total death count
+            with open('death.p', 'wb') as file:
+                dump(corona_value, file)
+            
+    sleep_amount = localtime()[4]
+    if sleep_amount < 30:
+        sleep(1800 - (sleep_amount*60) - localtime()[5])
+    elif sleep_amount >=30:
+        sleep(1800 - ((sleep_amount-30)*60) - localtime()[5])
+    main(update_count)
 
 
 # If an error occurs during data collection.
@@ -113,6 +129,4 @@ def login():
 
 
 if __name__ == '__main__':
-    while True:
-        main()
-        sleep(1800 - localtime()[5])
+    main(0)
