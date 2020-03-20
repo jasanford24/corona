@@ -29,12 +29,12 @@ def state_count():
 
     # Clicks "Show More" button to show all states
     element = drvr.find_element_by_xpath(
-        '//*[@id="coronavirus-us-cases"]/div/div/div[3]/div/button')
+        '//*[@id="coronavirus-us-cases"]/div/div/div[4]/div/button')
     drvr.execute_script("arguments[0].click();", element)
 
     # Collects state data and transforms it into useable data.
     states = drvr.find_elements_by_xpath(
-        '//*[@id="coronavirus-us-cases"]/div/div/div[3]/div/table')
+        '//*[@id="coronavirus-us-cases"]/div/div/div[4]/div/table')
     temp = [x for x in states[0].text.split('\n')][1:]
     test = [x.split() for x in temp]
     for x in test:
@@ -42,9 +42,16 @@ def state_count():
             x[0] = " ".join(x[:-2])
             for y in reversed(range(len(x) - 3)):
                 del x[y + 1]
+
+    element = drvr.find_element_by_xpath(
+        '//*[@id="coronavirus-us-cases"]/div/div/div[6]/div/button')
+    drvr.execute_script("arguments[0].click();", element)
+    states = drvr.find_elements_by_xpath(
+        '//*[@id="coronavirus-us-cases"]/div/div/div[6]/div/table')
+    temp = [x for x in states[0].text.split('\n')][1:]
     drvr.close()
     logging.warning('Webscrape ending.')
-    return test
+    return test, temp
 
 
 # Main function that collects the data and sends personalized data to each phone number
@@ -55,12 +62,11 @@ def main(update_count):
         update_count = 0
 
     # If after 10am, attempt update. If updated, don't attempt to update again until after 8pm
-    if (localtime()[3] > 9 and update_count == 0) or (localtime()[3] > 19
-                                                      and update_count == 1):
+    if (localtime()[3] > 9 and update_count == 0) or (localtime()[3] > 19 and update_count == 1):
 
         # Catches any errors that may occur during collection
         try:
-            state_df = state_count()
+            state_df, temp = state_count()
         except:
             emergency()
 
@@ -83,18 +89,35 @@ def main(update_count):
                 state_death = '0'
 
                 for x in state_df:
-                    if numbers[k] == x[0]:
+                    if numbers[k][0] == x[0]:
                         state_case = x[1]
                         state_death = x[2]
 
-                message = 'Total U.S. Covid-19 death count is now ' + \
-                    str(corona_value) + " with " + numbers[k] + " having " + \
-                    state_case + " confirmed cases and " + state_death +\
-                    " deaths."
-
-                message = twilioCli.messages.create(body=message,
-                                                    from_=logins[2],
-                                                    to=k)
+                county_count = [
+                    x for x in temp
+                    if numbers[k][0] in x and numbers[k][1] in x
+                ][0].split()[-1]
+                if numbers[k][0] == 'New York':
+                    message = 'Total U.S. Covid-19 death count is now ' + \
+                        str(corona_value) + '. ' + numbers[k][0] + " State has " + \
+                        state_case + " cases and " + state_death +\
+                        " deaths." + " The New York City area has " + \
+                        county_count + ' cases.'
+                elif county_count == '1':
+                    message = 'Total U.S. Covid-19 death count is now ' + \
+                        str(corona_value) + '. ' + numbers[k][0] + " State has " + \
+                        state_case + " cases and " + state_death +\
+                        " deaths." + " The " + numbers[k][1] + " area has " + \
+                        county_count + ' case.'
+                else:
+                    message = 'Total U.S. Covid-19 death count is now ' + \
+                        str(corona_value) + '. ' + numbers[k][0] + " State has " + \
+                        state_case + " cases and " + state_death +\
+                        " deaths." + " The " + numbers[k][1] + " area has " + \
+                        county_count + ' cases.'
+                
+                message = twilioCli.messages.create(body=message, from_=logins[2], to=k)
+            
             update_count += 1
             logging.warning('Messages sent.')
             # Saves updated total death count
@@ -138,4 +161,4 @@ def login():
 
 
 if __name__ == '__main__':
-    main(0)
+    main(3)
