@@ -53,11 +53,12 @@ def main(update_count):
 
     # Resets update count for each day
     if localtime()[3] < 10 and update_count != 0:
-        update_count = 0
+        update_count[1] = 0
+        with open('death.p', 'wb') as file:
+            dump(update_count, file)
 
     # If after 10am, attempt update. If updated, don't attempt to update again until after 8pm
-    if (localtime()[3] > 9 and update_count == 0) or (localtime()[3] > 19
-                                                      and update_count == 1):
+    if (localtime()[3] > 9 and update_count[1] == 0) or (localtime()[3] > 19 and update_count[1] == 1):
 
         # Catches any errors that may occur during collection
         try:
@@ -70,7 +71,7 @@ def main(update_count):
             [int(x.replace(',', '').split()[-1]) for x in state_df])
 
         # If total number is greater than previous total, send updated text.
-        if total_death > past():
+        if total_death > update_count[0]:
 
             logins = login()
             twilioCli = Client(logins[0], logins[1])
@@ -103,11 +104,11 @@ def main(update_count):
                                                     from_=logins[2],
                                                     to=k)
 
-            update_count += 1
+            update_count[1] += 1
             logging.warning('Messages sent.')
             # Saves updated total death count
             with open('death.p', 'wb') as file:
-                dump(total_death, file)
+                dump(update_count, file)
 
     sleep_amount = localtime()[4]
     if sleep_amount < 30:
@@ -146,4 +147,4 @@ def login():
 
 
 if __name__ == '__main__':
-    main(0)
+    main(past())
