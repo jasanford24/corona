@@ -54,21 +54,18 @@ def main(update_count):
     # Resets update count for each day
     if localtime()[3] < 10 and update_count != 0:
         update_count[1] = 0
-        with open('death.p', 'wb') as file:
+        with open('misc.p', 'wb') as file:
             dump(update_count, file)
 
     # If after 10am, attempt update. If updated, don't attempt to update again until after 8pm
     if (localtime()[3] > 9 and update_count[1] == 0) or (localtime()[3] > 19 and update_count[1] == 1):
 
-        # Catches any errors that may occur during collection
-        try:
-            state_df, county_df = state_count()
-        except:
-            emergency()
+        # Loads collected data
+        state_df, county_df = state_count()
 
-        # Total number of deaths in the US
-        total_death = sum(
-            [int(x.replace(',', '').split()[-1]) for x in state_df])
+        # Total number of deaths and cases in the US
+        total_deaths = sum([int(x.replace(',', '').split()[-1]) for x in state_df])
+        total_cases = sum([int(x.replace(',','').split()[-1]) for x in county_df])
 
         # If total number is greater than previous total, send updated text.
         if total_death > update_count[0]:
@@ -87,27 +84,24 @@ def main(update_count):
                     if numbers[k][0] in x:
                         death_count = x.split()[-1]
                         case_count = x.split()[-2]
-                county_count = [x for x in county_df if numbers[k][0] in x and numbers[k][1] in x][0].split()[-1]
-
-                message = 'Total U.S. Covid-19 death count is now ' + str(total_death) + '. ' + \
-                    numbers[k][0] + " has " + case_count + " cases and " + \
-                    death_count + " deaths. "
-
-                if numbers[k][1] == 'New York New York':
-                    message += "New York county has " + county_count + ' cases.'
-                elif county_count == '1':
-                    message += numbers[k][1] + " county has " + county_count + ' case.'
-                else:
-                    message += numbers[k][1] + " county has " + county_count + ' cases.'
-
+                for x in county_df:
+                    if numbers[k][1] in x[len(numbers[k][0])+1:]:
+                        county_count = x.split()[-1]
+                
+                message = 'U.S. Covid-19\nTotal Cases: ' + f"{total_cases:,d}" + \
+                            '\nTotal Deaths: ' + f"{total_deaths:,d}" + '\n' + \
+                            numbers[k][0] + ":\nCases: " + case_count + "\nDeaths: " + \
+                            death_count + "\n" + numbers[k][1] + " County:\nCases: " + county_count
+                
                 message = twilioCli.messages.create(body=message,
                                                     from_=logins[2],
                                                     to=k)
 
             update_count[1] += 1
             logging.warning('Messages sent.')
+            
             # Saves updated total death count
-            with open('death.p', 'wb') as file:
+            with open('misc.p', 'wb') as file:
                 dump(update_count, file)
 
     sleep_amount = localtime()[4]
@@ -118,25 +112,9 @@ def main(update_count):
     main(update_count)
 
 
-# If an error occurs during data collection.
-# Sends me a text and shuts program down.
-def emergency():
-    from sys import exit
-
-    logins = login()
-    accountSID = logins[0]
-    authToken = logins[1]
-
-    message = twilioCli.messages.create(
-        body='Something went wrong.  Shutting down.',
-        from_=logins[2],
-        to=logins[3])
-    exit()
-
-
 # Loads previous total death count.
 def past():
-    with open('death.p', 'rb') as pfile:
+    with open('misc.p', 'rb') as pfile:
         return load(pfile)
 
 
@@ -147,4 +125,9 @@ def login():
 
 
 if __name__ == '__main__':
-    main(past())
+    try:
+        main(past())
+    except:
+        with open('misc.p', 'wb') as file:
+            dump([0,0], file)
+        main(past())
