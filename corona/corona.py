@@ -68,7 +68,7 @@ def main(update_count):
         total_cases = sum([int(x.replace(',','').split()[-1]) for x in county_df])
 
         # If total number is greater than previous total, send updated text.
-        if total_death > update_count[0]:
+        if total_deaths > update_count[0]:
 
             logins = login()
             twilioCli = Client(logins[0], logins[1])
@@ -78,7 +78,8 @@ def main(update_count):
                 numbers = load(pfile)
 
             logging.warning('Sending text messages.')
-
+            
+            
             for k in numbers:
                 for x in state_df:
                     if numbers[k][0] in x:
@@ -88,11 +89,12 @@ def main(update_count):
                     if numbers[k][1] in x[len(numbers[k][0])+1:]:
                         county_count = x.split()[-1]
                 
+                
                 message = 'U.S. Covid-19\nTotal Cases: ' + f"{total_cases:,d}" + \
                             '\nTotal Deaths: ' + f"{total_deaths:,d}" + '\n' + \
                             numbers[k][0] + ":\nCases: " + case_count + "\nDeaths: " + \
                             death_count + "\n" + numbers[k][1] + " County:\nCases: " + county_count
-                
+                #logging.warning(f'{message}')
                 message = twilioCli.messages.create(body=message,
                                                     from_=logins[2],
                                                     to=k)
@@ -112,6 +114,22 @@ def main(update_count):
     main(update_count)
 
 
+
+# If an error occurs during data collection.
+# Sends me a text and shuts program down.
+def emergency():
+    from sys import exit
+
+    logins = login()
+    twilioCli = Client(logins[0], logins[1])
+
+    message = twilioCli.messages.create(
+        body="Something has gone wrong.",
+        from_=logins[2],
+        to=logins[3])
+    exit()
+
+
 # Loads previous total death count.
 def past():
     with open('misc.p', 'rb') as pfile:
@@ -125,9 +143,4 @@ def login():
 
 
 if __name__ == '__main__':
-    try:
-        main(past())
-    except:
-        with open('misc.p', 'wb') as file:
-            dump([0,0], file)
-        main(past())
+    main(past())
