@@ -17,35 +17,48 @@ logging.basicConfig(filename='debug.log',
 # Collected data from NY Times website
 def state_count():
     logging.warning('Webscrape starting.')
+    
     options = Options()
     options.add_argument("--headless")
     options.add_argument("--incognito")
     options.binary_location = '/usr/bin/chromium-browser'
     driver_path = 'chromedriver'
-    drvr = webdriver.Chrome(options=options, executable_path=driver_path)
-    drvr.get(
+    baby_driver = webdriver.Chrome(options=options, executable_path=driver_path)
+    baby_driver.get(
         'https://www.nytimes.com/interactive/2020/us/coronavirus-us-cases.html'
     )
+    
+    # Clicks "Show More" button to show all state data
+    try:
+        element = baby_driver.find_element_by_xpath(
+            '//*[@id="coronavirus-us-cases"]/div/div/div[4]/div/button')
+        baby_driver.execute_script("arguments[0].click();", element)
+    except:
+        logging.warning('State data xpath error')
+        emergency()
 
-    # Clicks "Show More" button to show all states
-    element = drvr.find_element_by_xpath(
-        '//*[@id="coronavirus-us-cases"]/div/div/div[4]/div/button')
-    drvr.execute_script("arguments[0].click();", element)
-
-    # Collects state data and transforms it into useable data.
-    states = drvr.find_elements_by_xpath(
+    # Collects state data and transforms it.
+    states = baby_driver.find_elements_by_xpath(
         '//*[@id="coronavirus-us-cases"]/div/div/div[4]/div/table')
-    test = [x for x in states[0].text.split('\n')][1:]
-
-    element = drvr.find_element_by_xpath(
-        '//*[@id="coronavirus-us-cases"]/div/div/div[6]/div/button')
-    drvr.execute_script("arguments[0].click();", element)
-    states = drvr.find_elements_by_xpath(
+    state_df = [x for x in states[0].text.split('\n')][1:]
+    
+    # Clicks "Show More" button to show all county data
+    try:
+        element = baby_driver.find_element_by_xpath(
+            '//*[@id="coronavirus-us-cases"]/div/div/div[6]/div/button')
+        baby_driver.execute_script("arguments[0].click();", element)
+    except:
+        logging.warning('County data xpath error')
+        emergency()
+    
+    # Collects county data and transforms it.
+    states = baby_driver.find_elements_by_xpath(
         '//*[@id="coronavirus-us-cases"]/div/div/div[6]/div/table')
-    temp = [x for x in states[0].text.split('\n')][1:]
-    drvr.close()
+    county_df = [x for x in states[0].text.split('\n')][1:]
+    
+    baby_driver.close()
     logging.warning('Webscrape ending.')
-    return test, temp
+    return state_df, county_df
 
 
 # Main function that collects the data and sends personalized data to each phone number
@@ -65,11 +78,11 @@ def main(update_count):
 
         # Total number of deaths and cases in the US
         total_deaths = sum([int(x.replace(',', '').split()[-1]) for x in state_df])
-        total_cases = sum([int(x.replace(',','').split()[-1]) for x in county_df])
+        total_cases = sum([int(x.replace(',', '').split()[-1]) for x in county_df])
 
         # If total number is greater than previous total, send updated text.
         if total_deaths > update_count[0]:
-
+            
             logins = login()
             twilioCli = Client(logins[0], logins[1])
 
@@ -98,7 +111,7 @@ def main(update_count):
                 message = twilioCli.messages.create(body=message,
                                                     from_=logins[2],
                                                     to=k)
-
+            
             update_count[1] += 1
             logging.warning('Messages sent.')
             
@@ -132,8 +145,11 @@ def emergency():
 
 # Loads previous total death count.
 def past():
-    with open('misc.p', 'rb') as pfile:
-        return load(pfile)
+    try:
+        with open('misc.p', 'rb') as pfile:
+            return load(pfile)
+    except:
+        return [0,0]
 
 
 # Loads API data
