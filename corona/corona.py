@@ -4,8 +4,8 @@ import logging
 from pickle import dump, load
 from time import localtime, sleep
 
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
+import requests
+from bs4 import BeautifulSoup
 from twilio.rest import Client
 
 logging.basicConfig(filename='debug.log',
@@ -14,110 +14,99 @@ logging.basicConfig(filename='debug.log',
                     datefmt='%d-%b-%y %H:%M:%S')
 
 
-# Collected data from NY Times website
-def state_count():
-    logging.warning('Webscrape starting.')
-    
-    options = Options()
-    options.add_argument("--headless")
-    options.add_argument("--incognito")
-    options.binary_location = '/usr/bin/chromium-browser'
-    driver_path = 'chromedriver'
-    baby_driver = webdriver.Chrome(options=options, executable_path=driver_path)
-    baby_driver.get(
-        'https://www.nytimes.com/interactive/2020/us/coronavirus-us-cases.html'
-    )
-    
-    # Clicks "Show More" button to show all state data
-    try:
-        element = baby_driver.find_element_by_xpath(
-            '//*[@id="coronavirus-us-cases"]/div/div/div[4]/div/button')
-        baby_driver.execute_script("arguments[0].click();", element)
-    except:
-        logging.warning('State data xpath error')
-        emergency()
+def collect_worldometer():
+    URL = 'https://www.worldometers.info/coronavirus/country/us/'
 
-    # Collects state data and transforms it.
-    states = baby_driver.find_elements_by_xpath(
-        '//*[@id="coronavirus-us-cases"]/div/div/div[4]/div/table')
-    state_df = [x for x in states[0].text.split('\n')][1:]
-    
-    # Clicks "Show More" button to show all county data
-    try:
-        element = baby_driver.find_element_by_xpath(
-            '//*[@id="coronavirus-us-cases"]/div/div/div[6]/div/button')
-        baby_driver.execute_script("arguments[0].click();", element)
-    except:
-        logging.warning('County data xpath error')
-        emergency()
-    
-    # Collects county data and transforms it.
-    states = baby_driver.find_elements_by_xpath(
-        '//*[@id="coronavirus-us-cases"]/div/div/div[6]/div/table')
-    county_df = [x for x in states[0].text.split('\n')][1:]
-    
-    baby_driver.close()
-    logging.warning('Webscrape ending.')
-    return state_df, county_df
+    page = requests.get(URL)
+    soup = BeautifulSoup(page.content, 'html.parser')
+
+    results = soup.find(id='usa_table_countries_today')
+    test = results.find_all('td')
+
+    total_cases = test[-7:][-1].text.strip()
+    total_deaths = test[-7:][3].text.strip()
+    total_recovered = test[-7:][-2].text.strip()
+    total_death_change = test[-7:][4].text.strip()
+
+    table = []
+    list = []
+    count = 0
+    for x in test:
+        if count < 7:
+            list.append(x.text.strip())
+        else:
+            table.append(list)
+            list = []
+            list.append(x.text.strip())
+            count = 0
+        count += 1
+    return table, total_cases, total_deaths, total_recovered, total_death_change
 
 
 # Main function that collects the data and sends personalized data to each phone number
 def main(update_count):
 
     # Resets update count for each day
-    if localtime()[3] < 10 and update_count != 0:
+    if localtime()[3] < 20 and update_count != 0:
         update_count[1] = 0
         with open('misc.p', 'wb') as file:
             dump(update_count, file)
 
     # If after 10am, attempt update. If updated, don't attempt to update again until after 8pm
-    if (localtime()[3] > 9 and update_count[1] == 0) or (localtime()[3] > 19 and update_count[1] == 1):
+    if (localtime()[3] == 19 and update_count[1] == 0):
+        sleep(60*59)
+        logins = login()
+        twilioCli = Client(logins[0], logins[1])
 
-        # Loads collected data
-        state_df, county_df = state_count()
+        # Load {phone_number:state} data from pickle
+        with open('numbers.p', 'rb') as pfile:
+            numbers = load(pfile)
 
-        # Total number of deaths and cases in the US
-        total_deaths = sum([int(x.replace(',', '').split()[-1]) for x in state_df])
-        total_cases = sum([int(x.replace(',', '').split()[-1]) for x in county_df])
+        logging.warning('Sending text messages.')
 
-        # If total number is greater than previous total, send updated text.
-        if total_deaths > update_count[0]:
-            
-            logins = login()
-            twilioCli = Client(logins[0], logins[1])
+        table, total_cases, total_deaths, total_recovered, total_death_change = collect_worldometer()
+        
+        sleep(60)
+        
+        for k in numbers:
+            for x in table:
+                if x[0] == numbers[k][0]:
+                    state_case_count = x[-1]
+                    state_death_count = x[3]
+                    state_death_change = x[4]
 
-            # Load {phone_number:state} data from pickle
-            with open('numbers.p', 'rb') as pfile:
-                numbers = load(pfile)
+            for x in county_df:
+                if numbers[k][1] in x[len(numbers[k][0]) + 1:]:
+                    county_count = x.split()[-1]
 
-            logging.warning('Sending text messages.')
-            
-            
-            for k in numbers:
-                for x in state_df:
-                    if numbers[k][0] in x:
-                        death_count = x.split()[-1]
-                        case_count = x.split()[-2]
-                for x in county_df:
-                    if numbers[k][1] in x[len(numbers[k][0])+1:]:
-                        county_count = x.split()[-1]
-                
-                
-                message = 'U.S. Covid-19\nTotal Cases: ' + f"{total_cases:,d}" + \
-                            '\nTotal Deaths: ' + f"{total_deaths:,d}" + '\n' + \
-                            numbers[k][0] + ":\nCases: " + case_count + "\nDeaths: " + \
-                            death_count + "\n" + numbers[k][1] + " County:\nCases: " + county_count
-                #logging.warning(f'{message}')
-                message = twilioCli.messages.create(body=message,
-                                                    from_=logins[2],
-                                                    to=k)
-            
-            update_count[1] += 1
-            logging.warning('Messages sent.')
-            
-            # Saves updated total death count
-            with open('misc.p', 'wb') as file:
-                dump(update_count, file)
+            if state_case_count == '':
+                state_case_count = '0'
+            if state_death_count == '':
+                state_death_count = '0'
+
+            message = 'U.S. Covid-19\nActive Cases: ' + total_cases + \
+                '\nTotal Deaths: ' + total_deaths
+
+            if total_death_change != '':
+                message += ' (+' + total_death_change + ')'
+
+            message += '\nTotal Recovered: ' + total_recovered + '\n' + \
+                numbers[k][0] + ":\nCases: " + state_case_count + "\nDeaths: " + \
+                state_death_count
+
+            if state_death_change != '':
+                message += ' (' + state_death_change + ')'
+
+            message = twilioCli.messages.create(body=message,
+                                                from_=logins[2],
+                                                to=k)
+
+        update_count[1] += 1
+        logging.warning('Messages sent.')
+
+        # Saves updated total death count
+        with open('misc.p', 'wb') as file:
+            dump(update_count, file)
 
     sleep_amount = localtime()[4]
     if sleep_amount < 30:
@@ -125,7 +114,6 @@ def main(update_count):
     elif sleep_amount >= 30:
         sleep(1800 - ((sleep_amount - 30) * 60) - localtime()[5])
     main(update_count)
-
 
 
 # If an error occurs during data collection.
@@ -136,10 +124,9 @@ def emergency():
     logins = login()
     twilioCli = Client(logins[0], logins[1])
 
-    message = twilioCli.messages.create(
-        body="Something has gone wrong.",
-        from_=logins[2],
-        to=logins[3])
+    message = twilioCli.messages.create(body="Something has gone wrong.",
+                                        from_=logins[2],
+                                        to=logins[3])
     exit()
 
 
@@ -149,7 +136,7 @@ def past():
         with open('misc.p', 'rb') as pfile:
             return load(pfile)
     except:
-        return [0,0]
+        return [0, 0]
 
 
 # Loads API data
