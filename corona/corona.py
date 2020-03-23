@@ -114,9 +114,9 @@ def main():
             message += ' (' + state_death_change + ')'
         message += "\n" + numbers[k][1] + ":\nCases: " + county_count
         
-        # message = twilioCli.messages.create(body=message,
-        #                                    from_=logins[2],
-        #                                    to=k)
+        message = twilioCli.messages.create(body=message,
+                                            from_=logins[2],
+                                            to=k)
         
         #print(message)
         #print()
