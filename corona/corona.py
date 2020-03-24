@@ -1,5 +1,6 @@
 from pickle import dump, load
 from time import localtime, sleep
+import pandas as pd
 
 import requests
 from bs4 import BeautifulSoup
@@ -92,7 +93,7 @@ class Account:
         self.county_case_count = '0'
     
     
-    def set_state_data(self, table):
+    def set_data(self, table):
         self.total_cases = sum([int(x.replace(',','')) for x in table['TotalCases'] if x != ''])
         self.total_deaths = sum([int(x.replace(',','')) for x in table['TotalDeaths'] if x != ''])
         self.new_deaths = sum([int(x.replace(',','')) for x in table['NewDeaths'] if x != ''])
@@ -123,6 +124,11 @@ class Account:
     
     
     def send_sms(self):
+        with open('login.p', 'rb') as pfile:
+            logins = load(pfile)
+        
+        twilioCli = Client(logins[0], logins[1])
+        
         twilioCli.messages.create(body=self.message,
                                   from_=logins[2],
                                   to=self.number)
@@ -134,7 +140,9 @@ class Account:
 def emergency():
     from sys import exit
 
-    logins = login()
+    with open('login.p', 'rb') as pfile:
+        logins = load(pfile)
+    
     twilioCli = Client(logins[0], logins[1])
 
     message = twilioCli.messages.create(
@@ -146,21 +154,20 @@ def emergency():
 
 
 def main():
-    county_df = collect_county_count()
-
-
-    with open('login.p', 'rb') as pfile:
-        logins = load(pfile)
+    data = collect_worldometer()
+    county_data = collect_county_count()
     
+    with open('accounts.p', 'rb') as pfile:
+        accounts = load(pfile)
 
     for x in accounts:
         recipient = Account(*x)
-        recipient.set_state_data(collect_worldometer())
-        recipient.set_county_data(county_df)
+        recipient.set_data(data)
+        recipient.set_county_data(county_data)
         recipient.build_message()
-        #recipient.message()
-        #print()
-        recipient.send_sms()
+        print(recipient.message)
+        print()
+        #recipient.send_sms()
 
 
 if __name__=="__main__":
