@@ -1,3 +1,5 @@
+#  Raspberry Pi 4B
+
 from pickle import dump, load
 from time import localtime, sleep
 import pandas as pd
@@ -52,8 +54,8 @@ def collect_county_count():
     options = Options()
     options.add_argument("--headless")
     options.add_argument("--incognito")
-    options.binary_location = '/Applications/Brave Browser.app/Contents/MacOS/Brave Browser'
-    driver_path = '/Users/noumenari/Documents/Python Projects/chromedriver'
+    options.binary_location = '/usr/bin/chromium-browser'
+    driver_path = 'chromedriver'
     baby_driver = webdriver.Chrome(options=options,
                                    executable_path=driver_path)
     baby_driver.get(
@@ -158,7 +160,7 @@ def main():
     
     with open('accounts.p', 'rb') as pfile:
         accounts = load(pfile)
-
+    
     for x in accounts:
         recipient = Account(*x)
         recipient.set_data(data)
