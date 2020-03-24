@@ -7,8 +7,6 @@ from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from twilio.rest import Client
 
-collection_list = ['TotalCases', 'TotalDeaths', 'TotalRecovered', 'NewDeaths']
-
 
 def collect_worldometer():
     global column_heads
@@ -23,17 +21,17 @@ def collect_worldometer():
 
     # Gets number of columns, in case they change the size of the table
     column_num = len(column_heads)
-    
-    
-    total_stats = []
-    for x in collection_list:
-        total_stats.append(test[-column_num:][column_get(x)].text.strip())
-    
-    
+
     table = []
     list = []
-
     count = 0
+
+    for x in column_heads:
+        list.append(x.text.strip())
+
+    table.append(list)
+    list = []
+
     for x in test:
         if count < column_num:
             list.append(x.text.strip())
@@ -43,7 +41,11 @@ def collect_worldometer():
             list.append(x.text.strip())
             count = 0
         count += 1
-    return table, total_stats
+
+    table = [x[:-1] for x in table]
+    table = pd.DataFrame(table[1:], columns=table[0])
+    
+    return table
 
 
 def collect_county_count():
@@ -64,7 +66,6 @@ def collect_county_count():
             '//*[@id="coronavirus-us-cases"]/div/div/div[6]/div/button')
         baby_driver.execute_script("arguments[0].click();", element)
     except:
-        logging.warning('County data xpath error')
         emergency()
 
     # Collects county data and transforms it.
@@ -76,59 +77,91 @@ def collect_county_count():
     return county_df
 
 
-def main():
-    table, total_stats = collect_worldometer()
+class Account:
+    
+    def __init__(self, number, state, county):
+        self.number = number
+        self.state = state
+        self.county = county
+        self.message = ''
+        self.total_cases = '0'
+        self.total_deaths = '0'
+        self.new_deaths = '0'
+        self.state_case_count = '0'
+        self.state_death_count = '0'
+        self.county_case_count = '0'
+    
+    
+    def set_state_data(self, table):
+        self.total_cases = sum([int(x.replace(',','')) for x in table['TotalCases'] if x != ''])
+        self.total_deaths = sum([int(x.replace(',','')) for x in table['TotalDeaths'] if x != ''])
+        self.new_deaths = sum([int(x.replace(',','')) for x in table['NewDeaths'] if x != ''])
+        
+        for index, row in table.iterrows():
+            if row['USAState'] == self.state:
+                if row['TotalCases'] != '':
+                    self.state_case_count = row['TotalCases']
+                if row['TotalDeaths'] != '':
+                    self.state_death_count = row['TotalDeaths']
+    
+    def set_county_data(self, county_df):
+        for x in county_df:
+            t = len(self.state) + 1
+            if self.county == x[t:t + len(self.county)]:
+                self.county_case_count = x.split()[-1]
+    
+    def build_message(self):
+        message  = 'U.S. Covid-19'
+        message += '\nTotal Cases: ' + f"{self.total_cases:,d}"
+        message += '\nTotal Deaths: ' + f"{self.total_deaths:,d}" + ' (+' + f"{self.new_deaths:,d}" + ')'
+        message += '\n' + self.state + ':'
+        message += '\nCases: ' + self.state_case_count
+        message += '\nDeaths: ' + self.state_death_count
+        message += "\n" + self.county + ":"
+        message += "\nCases: " + self.county_case_count
+        self.message = message
+    
+    
+    def send_sms(self):
+        twilioCli.messages.create(body=self.message,
+                                  from_=logins[2],
+                                  to=self.number)
 
+
+
+# If an error occurs during data collection.
+# Sends me a text and shuts program down.
+def emergency():
+    from sys import exit
+
+    logins = login()
+    twilioCli = Client(logins[0], logins[1])
+
+    message = twilioCli.messages.create(
+        body="Something has gone wrong.",
+        from_=logins[2],
+        to=logins[3])
+    exit()
+
+
+
+def main():
     county_df = collect_county_count()
+
 
     with open('login.p', 'rb') as pfile:
         logins = load(pfile)
-
-    twilioCli = Client(logins[0], logins[1])
-
-    for k in numbers:
-        for x in table:
-            if x[0] == numbers[k][0]:
-                state_case_count = x[column_get(collection_list[0])]
-                state_death_count = x[column_get(collection_list[1])]
-                state_death_change = x[column_get(collection_list[3])]
-
-        if state_case_count == '':
-            state_case_count = '0'
-        if state_death_count == '':
-            state_death_count = '0'
-
-        for x in county_df:
-            if numbers[k][1] in x[len(numbers[k][0]) + 1:]:
-                county_count = x.split()[-1]
-
-        # Craft personalized message
-        message = 'U.S. Covid-19\nTotal Cases: ' + total_stats[0] + \
-            '\nTotal Deaths: ' + total_stats[1]
-        if total_stats[3] != '':
-            message += ' (+' + total_stats[3] + ')'
-        message += '\nTotal Recovered: ' + total_stats[2] + '\n' + \
-            numbers[k][0] + ":\nCases: " + state_case_count + "\nDeaths: " + \
-            state_death_count
-        if state_death_change != '':
-            message += ' (' + state_death_change + ')'
-        message += "\n" + numbers[k][1] + ":\nCases: " + county_count
-        
-        message = twilioCli.messages.create(body=message,
-                                            from_=logins[2],
-                                            to=k)
-        
-        #print(message)
-        #print()
     
-    sleep(86400 - localtime()[5])
+
+    for x in accounts:
+        recipient = Account(*x)
+        recipient.set_state_data(collect_worldometer())
+        recipient.set_county_data(county_df)
+        recipient.build_message()
+        recipient.message()
+        print()
+        #recipient.send_sms()
+
+
+if __name__=="__main__":
     main()
-
-def column_get(tem):
-    for x in range(len(column_heads)):
-        if column_heads[x].text == tem:
-            return x
-
-
-if __name__ == '__main__':
-    main()    
