@@ -13,17 +13,21 @@ from twilio.rest import Client
 
 def collect_worldometer():
     URL = 'https://www.worldometers.info/coronavirus/country/us/'
-
     page = requests.get(URL)
     soup = BeautifulSoup(page.content, 'html.parser')
-
+    
     results = soup.find(id='usa_table_countries_today')
     test = results.find_all('td')
     column_heads = results.find_all('th')
-
+    
+    # Gets number of recovered cases
+    # recovered = soup.find_all(class_="maincounter-number")[-1].text.strip()
+    
     # Gets number of columns, in case they change the size of the table
     column_num = len(column_heads)
-
+    
+    
+    # Unhappy with this section.  I know there's a better way to do this.
     table = []
     list = []
     count = 0
@@ -36,16 +40,25 @@ def collect_worldometer():
 
     for x in test:
         if count < column_num:
-            list.append(x.text.strip())
+            if x.text.strip() == '':
+                list.append('0')
+            else:
+                list.append(x.text.strip().replace('+','').replace(',',''))
         else:
             table.append(list)
             list = []
-            list.append(x.text.strip())
+            if x.text.strip() == '':
+                list.append('0')
+            else:
+                list.append(x.text.strip().replace('+','').replace(',',''))
             count = 0
         count += 1
-
+    
+    table.append(list)
     table = [x[:-1] for x in table]
     table = pd.DataFrame(table[1:], columns=table[0])
+    table.set_index(table['USAState'], inplace=True)
+    table.pop('USAState')
     
     return table
 
@@ -63,17 +76,16 @@ def collect_county_count():
     )
 
     # Clicks "Show More" button to show all county data
-    try:
-        element = baby_driver.find_element_by_xpath(
-            '//*[@id="coronavirus-us-cases"]/div/div/div[6]/div/button')
-        baby_driver.execute_script("arguments[0].click();", element)
-    except:
-        emergency()
+    element = baby_driver.find_element_by_xpath(
+        '//*[@id="coronavirus-us-cases"]/div/div/div[6]/div/button')
+    baby_driver.execute_script("arguments[0].click();", element)
 
     # Collects county data and transforms it.
     states = baby_driver.find_elements_by_xpath(
         '//*[@id="coronavirus-us-cases"]/div/div/div[6]/div/table')
-    county_df = [x for x in states[0].text.split('\n')][1:]
+    county_df = [x for x in states[0].text.split('\n')]
+    if 'COUNTY' not in county_df[0]:
+        emergency("NYTimes Collection failed.")
 
     baby_driver.close()
     return county_df
@@ -92,35 +104,42 @@ class Account:
         self.state_case_count = '0'
         self.state_death_count = '0'
         self.county_case_count = '0'
+        self.county_death_count = '0'
     
     
-    def set_data(self, table):
-        self.total_cases = sum([int(x.replace(',','')) for x in table['TotalCases'] if x != ''])
-        self.total_deaths = sum([int(x.replace(',','')) for x in table['TotalDeaths'] if x != ''])
-        self.new_deaths = sum([int(x.replace(',','')) for x in table['NewDeaths'] if x != ''])
+    def set_data(self, table, prior):
+        self.total_cases = table.iloc[-1]['TotalCases']
+        self.total_deaths = table.iloc[-1]['TotalDeaths']
+        self.new_deaths = str(int(table.iloc[-1]['TotalDeaths']) - prior.iloc[-1]['TotalDeaths'])
         
-        for index, row in table.iterrows():
-            if row['USAState'] == self.state:
-                if row['TotalCases'] != '':
-                    self.state_case_count = row['TotalCases']
-                if row['TotalDeaths'] != '':
-                    self.state_death_count = row['TotalDeaths']
+        self.state_case_count = table.loc[self.state]['TotalCases']
+        self.state_death_count = table.loc[self.state]['TotalDeaths']
+        
+        
+        
     
     def set_county_data(self, county_df):
-        for x in county_df:
+        temp = county_df[0].split()
+        for x in county_df[1:]:
             t = len(self.state) + 1
             if self.county == x[t:t + len(self.county)]:
-                self.county_case_count = x.split()[-1]
-    
+                try:
+                    self.county_case_count = x.split()[temp.index('CASES') - len(temp)].replace(',','')
+                    self.county_death_count = x.split()[temp.index('DEATHS') - len(temp)].replace(',','')
+                except:
+                    emergency("NYT removed county cases/deaths")
+        
+    #f"{total_cases:,d}"
     def build_message(self):
-        message  = 'U.S. Covid-19'
-        message += '\nTotal Cases: ' + f"{self.total_cases:,d}"
-        message += '\nTotal Deaths: ' + f"{self.total_deaths:,d}" + ' (+' + f"{self.new_deaths:,d}" + ')'
-        message += '\n' + self.state + ':'
-        message += '\nCases: ' + self.state_case_count
-        message += '\nDeaths: ' + self.state_death_count
-        message += "\n" + self.county + ":"
-        message += "\nCases: " + self.county_case_count
+        message  = 'Covid-19'
+        message += '\nU.S. - ' + f"{int(self.total_cases):,d}"
+        message += '\nDeaths: ' + f"{int(self.total_deaths):,d}" #+ ' (+' + self.new_deaths + ')'
+        message += '\n' + self.state + ' - '
+        message += f"{int(self.state_case_count):,d}"
+        message += '\nDeaths: ' + f"{int(self.state_death_count):,d}"
+        message += "\n" + self.county + " - "
+        message += f"{int(self.county_case_count):,d}"
+        message += "\nDeaths: " + f"{int(self.county_death_count):,d}"
         self.message = message
     
     
@@ -138,7 +157,7 @@ class Account:
 
 # If an error occurs during data collection.
 # Sends me a text and shuts program down.
-def emergency():
+def emergency(mess):
     from sys import exit
 
     with open('login.p', 'rb') as pfile:
@@ -147,7 +166,7 @@ def emergency():
     twilioCli = Client(logins[0], logins[1])
 
     message = twilioCli.messages.create(
-        body="Something has gone wrong.",
+        body=mess,
         from_=logins[2],
         to=logins[3])
     exit()
@@ -158,20 +177,26 @@ def main():
     data = collect_worldometer()
     county_data = collect_county_count()
     
+    prior = pd.read_csv('prior_data.csv')
+    prior.set_index("USAState", inplace=True)
+    
     with open('accounts.p', 'rb') as pfile:
         accounts = load(pfile)
     
+    
     for x in accounts:
         recipient = Account(*x)
-        recipient.set_data(data)
+        recipient.set_data(data, prior)
         recipient.set_county_data(county_data)
         recipient.build_message()
         #print(recipient.message)
+        #print(len(recipient.message)+38)
         #print()
         recipient.send_sms()
     
-    with open('prior_data.p', 'wb') as file:
-        dump(data, file)
+    #emergency(recipient.message)
+    
+    data.to_csv('prior_data.csv')
 
 
 if __name__=="__main__":
