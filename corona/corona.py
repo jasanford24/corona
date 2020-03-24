@@ -10,7 +10,6 @@ from twilio.rest import Client
 
 
 def collect_worldometer():
-    global column_heads
     URL = 'https://www.worldometers.info/coronavirus/country/us/'
 
     page = requests.get(URL)
@@ -165,9 +164,12 @@ def main():
         recipient.set_data(data)
         recipient.set_county_data(county_data)
         recipient.build_message()
-        print(recipient.message)
-        print()
-        #recipient.send_sms()
+        #print(recipient.message)
+        #print()
+        recipient.send_sms()
+    
+    with open('prior_data.p', 'wb') as file:
+        dump(data, file)
 
 
 if __name__=="__main__":
