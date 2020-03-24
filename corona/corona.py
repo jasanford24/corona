@@ -158,9 +158,9 @@ def main():
         recipient.set_state_data(collect_worldometer())
         recipient.set_county_data(county_df)
         recipient.build_message()
-        recipient.message()
-        print()
-        #recipient.send_sms()
+        #recipient.message()
+        #print()
+        recipient.send_sms()
 
 
 if __name__=="__main__":
