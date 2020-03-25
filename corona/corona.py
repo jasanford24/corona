@@ -67,8 +67,10 @@ def collect_county_count():
     options = Options()
     options.add_argument("--headless")
     options.add_argument("--incognito")
-    options.binary_location = '/usr/bin/chromium-browser'
-    driver_path = 'chromedriver'
+    #options.binary_location = '/usr/bin/chromium-browser'
+    #driver_path = 'chromedriver'
+    options.binary_location = '/Applications/Brave Browser.app/Contents/MacOS/Brave Browser'
+    driver_path = '/Users/noumenari/Documents/Python Projects/chromedriver'
     baby_driver = webdriver.Chrome(options=options,
                                    executable_path=driver_path)
     baby_driver.get(
@@ -100,9 +102,10 @@ class Account:
         self.message = ''
         self.total_cases = '0'
         self.total_deaths = '0'
-        self.new_deaths = '0'
+        self.total_new_deaths = '0'
         self.state_case_count = '0'
         self.state_death_count = '0'
+        self.state_new_deaths = '0'
         self.county_case_count = '0'
         self.county_death_count = '0'
     
@@ -110,13 +113,12 @@ class Account:
     def set_data(self, table, prior):
         self.total_cases = table.iloc[-1]['TotalCases']
         self.total_deaths = table.iloc[-1]['TotalDeaths']
-        self.new_deaths = str(int(table.iloc[-1]['TotalDeaths']) - prior.iloc[-1]['TotalDeaths'])
+        self.total_new_deaths = str(int(table['TotalDeaths'][-1]) - prior['TotalDeaths'][-1])
         
         self.state_case_count = table.loc[self.state]['TotalCases']
         self.state_death_count = table.loc[self.state]['TotalDeaths']
-        
-        
-        
+        self.state_new_deaths = str(int(table['TotalDeaths'][self.state]) - prior['TotalDeaths'][self.state])
+    
     
     def set_county_data(self, county_df):
         temp = county_df[0].split()
@@ -128,15 +130,19 @@ class Account:
                     self.county_death_count = x.split()[temp.index('DEATHS') - len(temp)].replace(',','')
                 except:
                     emergency("NYT removed county cases/deaths")
-        
-    #f"{total_cases:,d}"
+    
+    
     def build_message(self):
         message  = 'Covid-19'
         message += '\nU.S. - ' + f"{int(self.total_cases):,d}"
-        message += '\nDeaths: ' + f"{int(self.total_deaths):,d}" #+ ' (+' + self.new_deaths + ')'
+        message += '\nDeaths: ' + f"{int(self.total_deaths):,d}"
+        if self.total_new_deaths != '0':
+            message += ' (+' + f"{int(self.total_new_deaths):,d}" + ')'
         message += '\n' + self.state + ' - '
         message += f"{int(self.state_case_count):,d}"
         message += '\nDeaths: ' + f"{int(self.state_death_count):,d}"
+        if self.state_new_deaths != '0':
+            message += ' (+' + f"{int(self.state_new_deaths):,d}" + ')'
         message += "\n" + self.county + " - "
         message += f"{int(self.county_case_count):,d}"
         message += "\nDeaths: " + f"{int(self.county_death_count):,d}"
@@ -172,8 +178,23 @@ def emergency(mess):
     exit()
 
 
+# Used to set activiation time to 8pm
+def calculate_time():
+    eight = 20*60*60
+    
+    day = 24*60*60
+    hour = (60*60)*localtime()[3]
+    minute = (60*localtime()[4])
+    second = localtime()[5]
+    
+    time_to_sleep = eight - (hour+minute+second)
+    if time_to_sleep < 0:
+        return day+time_to_sleep
+    return time_to_sleep
+
 
 def main():
+    sleep(calculate_time())
     data = collect_worldometer()
     county_data = collect_county_count()
     
@@ -196,7 +217,7 @@ def main():
     
     #emergency(recipient.message)
     
-    data.to_csv('prior_data.csv')
+    #data.to_csv('prior_data.csv')
 
 
 if __name__=="__main__":
