@@ -1,4 +1,4 @@
-#  Raspberry Pi 4B
+#  Raspberry Pi 4B Version
 
 from pickle import dump, load
 from time import localtime, sleep
@@ -22,7 +22,8 @@ def collect_data():
     # Collect State Data
     states = baby_driver.find_elements_by_xpath(
         '//*[@id="map"]/div[2]/div[1]/div[4]')
-    county_df = [x for x in states[0].text.split('\n')][11:]
+    county_df = [x for x in states[0].text.split('\n')][13:]
+    county_df = [x.replace(',','') for x in county_df if "+" not in x]
     state_data = pd.DataFrame(
         [county_df[x:x + 4:] for x in range(0, len(county_df), 4)],
         columns=['state', 'cases', 'deaths', 'rate'])
@@ -31,35 +32,34 @@ def collect_data():
         'state', 'county', 'county_cases', 'county_deaths', 'county_rates'
     ])
 
-    for x in range(len(state_data)):
+    for x in range(2,len(state_data)+1):
         # Clicks "Show More" button to show all county data
         element = baby_driver.find_element_by_xpath(
-            '//*[@id="map"]/div[2]/div[1]/div[4]/div[' + str(x + 2) +
+            '//*[@id="map"]/div[2]/div[1]/div[4]/div[' + str(x) +
             ']/div/span[1]')
         baby_driver.execute_script("arguments[0].click();", element)
         # Collects county data and transforms it.
         states = baby_driver.find_elements_by_xpath(
-            '//*[@id="map"]/div[2]/div[1]/div[4]/div[' + str(x + 2) +
-            ']/div[2]')
+            '//*[@id="map"]/div[2]/div[1]/div[4]/div[' + str(x) +']/div[2]')
         county_df = [x for x in states[0].text.split('\n')]
-        county_df = [x for x in county_df if "+" not in x]
+        county_df = [x.replace(',','') for x in county_df if "+" not in x]
         temp_data = pd.DataFrame(
             [county_df[x:x + 4:] for x in range(0, len(county_df), 4)],
             columns=[
                 'county', 'county_cases', 'county_deaths', 'county_rates'
             ])
-        temp_data['state'] = state_data['state'][x]
-        temp_data['state_cases'] = state_data['cases'][x]
-        temp_data['state_deaths'] = state_data['deaths'][x]
+        temp_data['state'] = state_data['state'][x-2]
+        temp_data['state_cases'] = state_data['cases'][x-2]
+        temp_data['state_deaths'] = state_data['deaths'][x-2]
         data = data.append(temp_data)
 
     baby_driver.close()
 
     data['county_deaths'] = [
-        x if x is not None else '0' for x in data['county_deaths']
+        x.replace(',','') if x is not None else '0' for x in data['county_deaths']
     ]
     data['county_cases'] = [
-        x if x is not None else '0' for x in data['county_cases']
+        x.replace(',','') if x is not None else '0' for x in data['county_cases']
     ]
     data.reset_index(inplace=True, drop=True)
     return data
@@ -85,7 +85,7 @@ class Account:
                        & (data['county'] == self.county)].reset_index(
                            drop=True)
         temp_prior = prior[prior['state'] == self.state].reset_index(drop=True)
-        
+
         self.total_cases = sum([int(x) for x in data['county_cases']])
         self.total_deaths = sum([int(x) for x in data['county_deaths']])
         self.total_new_deaths = str(
@@ -95,9 +95,9 @@ class Account:
         self.state_death_count = temp_df['state_deaths'][0]
         self.state_new_deaths = str(
             int(self.state_death_count) - int(temp_prior['state_deaths'][0]))
-        
+
         int(prior[prior['state']==self.state]['state_deaths'].reset_index(drop=True)[0])
-        
+
         self.county_case_count = temp_df['county_cases'][0]
         self.county_death_count = temp_df['county_deaths'][0]
 
@@ -129,6 +129,22 @@ class Account:
         twilioCli.messages.create(body=self.message,
                                   from_=logins[2],
                                   to=self.number)
+
+
+# If an error occurs during data collection.
+# Sends me a text and shuts program down.
+def emergency(mess):
+    from sys import exit
+
+    with open('login.p', 'rb') as pfile:
+        logins = load(pfile)
+
+    twilioCli = Client(logins[0], logins[1])
+
+    message = twilioCli.messages.create(body=mess,
+                                        from_=logins[2],
+                                        to=logins[3])
+    exit()
 
 
 # Used to set activiation time to 8pm
@@ -163,8 +179,7 @@ def main():
         recipient.build_message()
         recipient.send_sms()
 
-    data.to_csv('prior_data.csv')
-    
+    data.to_csv('prior_data.csv', index=False)
 
 if __name__ == "__main__":
     main()
