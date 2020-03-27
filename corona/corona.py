@@ -79,27 +79,31 @@ class Account:
         self.state_new_deaths = '0'
         self.county_case_count = '0'
         self.county_death_count = '0'
+        self.county_new_deaths = '0'
 
     def set_data(self, data, prior):
         temp_df = data[(data['state'] == self.state)
                        & (data['county'] == self.county)].reset_index(
                            drop=True)
-        temp_prior = prior[prior['state'] == self.state].reset_index(drop=True)
+        temp_prior = prior[(prior['state'] == self.state)
+                           & (prior['county'] == self.county)].reset_index(
+                               drop=True)
 
         self.total_cases = sum([int(x) for x in data['county_cases']])
         self.total_deaths = sum([int(x) for x in data['county_deaths']])
         self.total_new_deaths = str(
-            int(self.total_deaths) - int(prior['state_deaths'][-1:].reset_index(drop=True)[0]))
+            int(self.total_deaths) -
+            sum([int(x) for x in prior['county_deaths']]))
 
         self.state_case_count = temp_df['state_cases'][0]
         self.state_death_count = temp_df['state_deaths'][0]
         self.state_new_deaths = str(
             int(self.state_death_count) - int(temp_prior['state_deaths'][0]))
 
-        int(prior[prior['state']==self.state]['state_deaths'].reset_index(drop=True)[0])
-
         self.county_case_count = temp_df['county_cases'][0]
         self.county_death_count = temp_df['county_deaths'][0]
+        self.county_new_deaths = str(
+            int(self.county_death_count) - int(temp_prior['county_deaths'][0]))
 
     def build_message(self):
         message = 'Covid-19'
@@ -118,6 +122,8 @@ class Account:
             message += "\n" + self.county + " - "
         message += f"{int(self.county_case_count):,d}"
         message += "\nDeaths: " + f"{int(self.county_death_count):,d}"
+        if self.county_new_deaths != '0':
+            message += ' (+' + f"{int(self.county_new_deaths):,d}" + ')'
         self.message = message
 
     def send_sms(self):
@@ -166,7 +172,6 @@ def main():
     sleep(calculate_time())
 
     prior = pd.read_csv('prior_data.csv')
-    prior.set_index("USAState", inplace=True)
 
     data = collect_data()
 
