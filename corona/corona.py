@@ -21,45 +21,47 @@ def collect_data():
 
     # Collect State Data
     states = baby_driver.find_elements_by_xpath(
-        '//*[@id="map"]/div[2]/div[1]/div[4]')
+        '//*[@id="map"]/div[2]/div[1]/div[5]')
     county_df = [x for x in states[0].text.split('\n')][13:]
-    county_df = [x.replace(',','') for x in county_df if "+" not in x]
+    county_df = [x.replace(',', '') for x in county_df if "+" not in x and "%" not in x]
     state_data = pd.DataFrame(
-        [county_df[x:x + 4:] for x in range(0, len(county_df), 4)],
-        columns=['state', 'cases', 'deaths', 'rate'])
+        [county_df[x:x + 3:] for x in range(0, len(county_df), 3)],
+        columns=['state', 'cases', 'deaths'])
 
     data = pd.DataFrame(columns=[
-        'state', 'county', 'county_cases', 'county_deaths', 'county_rates'
+        'state', 'county', 'county_cases', 'county_deaths'
     ])
 
-    for x in range(2,len(state_data)+1):
+    for x in range(2, len(state_data) + 1):
         # Clicks "Show More" button to show all county data
         element = baby_driver.find_element_by_xpath(
-            '//*[@id="map"]/div[2]/div[1]/div[4]/div[' + str(x) +
+            '//*[@id="map"]/div[2]/div[1]/div[5]/div[' + str(x) +
             ']/div/span[1]')
         baby_driver.execute_script("arguments[0].click();", element)
         # Collects county data and transforms it.
         states = baby_driver.find_elements_by_xpath(
-            '//*[@id="map"]/div[2]/div[1]/div[4]/div[' + str(x) +']/div[2]')
-        county_df = [x for x in states[0].text.split('\n')]
-        county_df = [x.replace(',','') for x in county_df if "+" not in x]
+            '//*[@id="map"]/div[2]/div[1]/div[5]/div[' + str(x) + ']/div[2]')
+        county_df = [y for y in states[0].text.split('\n')]
+        county_df = [y.replace(',', '') for y in county_df if "+" not in y and "%" not in y]
         temp_data = pd.DataFrame(
-            [county_df[x:x + 4:] for x in range(0, len(county_df), 4)],
+            [county_df[y:y + 3:] for y in range(0, len(county_df), 3)],
             columns=[
-                'county', 'county_cases', 'county_deaths', 'county_rates'
+                'county', 'county_cases', 'county_deaths'
             ])
-        temp_data['state'] = state_data['state'][x-2]
-        temp_data['state_cases'] = state_data['cases'][x-2]
-        temp_data['state_deaths'] = state_data['deaths'][x-2]
+        temp_data['state'] = state_data['state'][x - 2]
+        temp_data['state_cases'] = state_data['cases'][x - 2]
+        temp_data['state_deaths'] = state_data['deaths'][x - 2]
         data = data.append(temp_data)
 
     baby_driver.close()
 
     data['county_deaths'] = [
-        x.replace(',','') if x is not None else '0' for x in data['county_deaths']
+        x.replace(',', '') if x is not None else '0'
+        for x in data['county_deaths']
     ]
     data['county_cases'] = [
-        x.replace(',','') if x is not None else '0' for x in data['county_cases']
+        x.replace(',', '') if x is not None else '0'
+        for x in data['county_cases']
     ]
     data.reset_index(inplace=True, drop=True)
     return data
@@ -185,6 +187,7 @@ def main():
         recipient.send_sms()
 
     data.to_csv('prior_data.csv', index=False)
+    main()
 
 if __name__ == "__main__":
     main()
