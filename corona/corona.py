@@ -83,8 +83,6 @@ def bay_area_collection():
     options.add_argument("--incognito")
     options.binary_location = '/usr/bin/chromium-browser'
     driver_path = 'chromedriver'
-    options.binary_location = '/Applications/Brave Browser.app/Contents/MacOS/Brave Browser'
-    driver_path = '/Users/noumenari/Documents/Python Projects/chromedriver'
     baby_driver = webdriver.Chrome(options=options,
                                    executable_path=driver_path)
     baby_driver.get('https://projects.sfchronicle.com/2020/coronavirus-map/')
@@ -156,21 +154,21 @@ class Account:
 
     #  Builds personalized client message
     def build_message(self):
-        message = 'Covid-19'
-        message += '\nU.S. - ' + f"{int(self.total_cases):,d}"
+        message = 'US Covid-19'
+        message += '\nCases: ' + f"{int(self.total_cases):,d}"
         message += '\nDeaths: ' + f"{int(self.total_deaths):,d}"
         if self.total_new_deaths != '0':
             message += ' (+' + f"{int(self.total_new_deaths):,d}" + ')'
-        message += '\n' + self.state + ' - '
-        message += f"{int(self.state_case_count):,d}"
+        message += '\n' + self.state
+        message += '\nCases: ' + f"{int(self.state_case_count):,d}"
         message += '\nDeaths: ' + f"{int(self.state_death_count):,d}"
         if self.state_new_deaths != '0':
             message += ' (+' + f"{int(self.state_new_deaths):,d}" + ')'
         if self.county == 'New York':
-            message += "\n" + self.county + " City - "
+            message += "\n" + self.county + " City"
         else:
-            message += "\n" + self.county + " - "
-        message += f"{int(self.county_case_count):,d}"
+            message += "\n" + self.county
+        message += "\nCases: " + f"{int(self.county_case_count):,d}"
         message += "\nDeaths: " + f"{int(self.county_death_count):,d}"
         if self.county_new_deaths != '0':
             message += ' (+' + f"{int(self.county_new_deaths):,d}" + ')'
