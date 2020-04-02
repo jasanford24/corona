@@ -1,4 +1,4 @@
-import random
+from random import randint
 from pickle import dump, load
 from time import sleep
 
@@ -34,8 +34,6 @@ def main():
     options.add_argument("--incognito")
     options.binary_location = '/usr/bin/chromium-browser'
     driver_path = 'chromedriver'
-    options.binary_location = '/Applications/Brave Browser.app/Contents/MacOS/Brave Browser'
-    driver_path = '/Users/noumenari/Documents/Python Projects/chromedriver'
     baby_driver = webdriver.Chrome(options=options,
                                    executable_path=driver_path)
     baby_driver.get(URL)
@@ -50,14 +48,13 @@ def main():
     inbox_form = baby_driver.find_element_by_id('input_3_4')
 
     # Send random first and last name to webform.
-    first_name_form.send_keys(firstname[random.randint(0, firstnames_length)])
-    last_name_form.send_keys(lastname[random.randint(
-        0, lastnames_length)].title())
+    first_name_form.send_keys(firstname[randint(0, firstname_length)])
+    last_name_form.send_keys(lastname[randint(0, lastname_length)].title())
 
     # pop random email and inbox from list so they don't get reused in the future and
     # send them to the webform
-    email_form.send_keys(email.pop(random.randint(0, email_length)))
-    inbox_form.send_keys(inbox.pop(random.randint(0, inbox_length)))
+    email_form.send_keys(email.pop(randint(0, email_length)))
+    inbox_form.send_keys(inbox.pop(randint(0, inbox_length)))
 
     # Save updated email and inbox list
     with open('email.p', 'wb') as pfile:
@@ -75,7 +72,7 @@ def main():
     baby_driver.close()
 
     # sleep the program for random time between 4 and 42 hours
-    sleep(random.randint(60 * 60 * 4, 60 * 60 * 42))
+    sleep(randint(60 * 60 * 4, 60 * 60 * 42))
     main()
 
 
