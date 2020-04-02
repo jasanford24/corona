@@ -28,7 +28,7 @@ def collect_data():
     states = baby_driver.find_elements_by_xpath(
         '//*[@id="map"]/div[2]/div[1]/div[5]')
     county_df = [
-        x.replace(',', '') for x in states[0].text.split('\n')
+        x.strip().replace(',', '') for x in states[0].text.split('\n')
         if "+" not in x and "%" not in x
     ]
 
@@ -37,14 +37,17 @@ def collect_data():
         if county_df[x] == "New York":
             county_df = county_df[x:]
             break
+    header = baby_driver.find_elements_by_xpath('//*[@id="map"]/div[2]/div[1]/div[5]/header')
+    header_size = len(header[0].text.split('\n')[:-1])
+
     #  Stores collected state data in a Pandas dataframe
     state_data = pd.DataFrame(
-        [county_df[x:x + 3:] for x in range(0, len(county_df), 3)],
-        columns=['state', 'cases', 'deaths'])
+        [county_df[x:x + header_size:] for x in range(0, len(county_df), header_size)],
+        columns=header[0].text.split('\n')[:-1])
 
     #  Creates an empty dataframe for county data
     data = pd.DataFrame(
-        columns=['state', 'county', 'county_cases', 'county_deaths'])
+        columns=['state', 'county', 'county_cases', 'county_recovered', 'county_deaths'])
 
     #  Loops through each state on the website and stores county data
     for x in range(2, len(state_data) + 1):
@@ -59,15 +62,16 @@ def collect_data():
         states = baby_driver.find_elements_by_xpath(
             '//*[@id="map"]/div[2]/div[1]/div[5]/div[' + str(x) + ']/div[2]')
         county_df = [
-            y.replace(',', '') for y in states[0].text.split('\n')
+            y.strip().replace(',', '') for y in states[0].text.split('\n')
             if "+" not in y and "%" not in y
         ]
         temp_data = pd.DataFrame(
-            [county_df[y:y + 3:] for y in range(0, len(county_df), 3)],
-            columns=['county', 'county_cases', 'county_deaths'])
-        temp_data['state'] = state_data['state'][x - 2]
-        temp_data['state_cases'] = state_data['cases'][x - 2]
-        temp_data['state_deaths'] = state_data['deaths'][x - 2]
+            [county_df[y:y + header_size:] for y in range(0, len(county_df), header_size)],
+            columns=['county', 'county_cases', 'county_recovered', 'county_deaths'])
+        temp_data['state'] = state_data['Location'][x - 2]
+        temp_data['state_cases'] = state_data['Confirmed'][x - 2]
+        temp_data['state_deaths'] = state_data['Deaths'][x - 2]
+        temp_data['state_recovered'] = state_data['Recovered'][x - 2]
         data = data.append(temp_data)
 
     baby_driver.close()
