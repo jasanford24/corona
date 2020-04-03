@@ -37,37 +37,43 @@ def collect_data():
         if county_df[x] == "New York":
             county_df = county_df[x:]
             break
+
     header = baby_driver.find_elements_by_xpath('//*[@id="map"]/div[2]/div[1]/div[5]/header')
-    header_size = len(header[0].text.split('\n')[:-1])
+    header = header[0].text.split('\n')
+
+    for x in range(0, len(header)):
+        if header[x].lower() == "fatality rate":
+            header.pop(x)
+            break
+    header_size = len(header)
 
     #  Stores collected state data in a Pandas dataframe
     state_data = pd.DataFrame(
         [county_df[x:x + header_size:] for x in range(0, len(county_df), header_size)],
-        columns=header[0].text.split('\n')[:-1])
+        columns=header)
 
     #  Creates an empty dataframe for county data
     data = pd.DataFrame(
-        columns=['state', 'county', 'county_cases', 'county_recovered', 'county_deaths'])
+        columns=['state', 'county', 'county_cases', 'county_deaths', 'county_recovered'])
 
     #  Loops through each state on the website and stores county data
     for x in range(2, len(state_data) + 1):
 
         # Clicks "Show More" button to show all county data
         element = baby_driver.find_element_by_xpath(
-            '//*[@id="map"]/div[2]/div[1]/div[5]/div[' + str(x) +
-            ']/div[1]/span[1]')
+            f'//*[@id="map"]/div[2]/div[1]/div[5]/div[{x}]/div[1]/span[1]')
         baby_driver.execute_script("arguments[0].click();", element)
 
         # Collects county data and transforms it.
         states = baby_driver.find_elements_by_xpath(
-            '//*[@id="map"]/div[2]/div[1]/div[5]/div[' + str(x) + ']/div[2]')
+            f'//*[@id="map"]/div[2]/div[1]/div[5]/div[{x}]/div[2]')
         county_df = [
             y.strip().replace(',', '') for y in states[0].text.split('\n')
             if "+" not in y and "%" not in y
         ]
         temp_data = pd.DataFrame(
             [county_df[y:y + header_size:] for y in range(0, len(county_df), header_size)],
-            columns=['county', 'county_cases', 'county_recovered', 'county_deaths'])
+            columns=['county', 'county_cases', 'county_deaths', 'county_recovered'])
         temp_data['state'] = state_data['Location'][x - 2]
         temp_data['state_cases'] = state_data['Confirmed'][x - 2]
         temp_data['state_deaths'] = state_data['Deaths'][x - 2]
@@ -155,28 +161,37 @@ class Account:
         self.county_death_count = current_data['county_deaths'][0]
         self.county_new_deaths = str(
             int(self.county_death_count) - int(prior_data['county_deaths'][0]))
+        self.message = self.build_message()
 
     #  Builds personalized client message
     def build_message(self):
         message = 'US Covid-19'
-        message += '\nCases: ' + f"{int(self.total_cases):,d}"
-        message += '\nDeaths: ' + f"{int(self.total_deaths):,d}"
+        message += f"\nCases: {int(self.total_cases):,d}"
+        message += f"\nDeaths: {int(self.total_deaths):,d}"
+
         if self.total_new_deaths != '0':
-            message += ' (+' + f"{int(self.total_new_deaths):,d}" + ')'
-        message += '\n' + self.state
-        message += '\nCases: ' + f"{int(self.state_case_count):,d}"
-        message += '\nDeaths: ' + f"{int(self.state_death_count):,d}"
+            message += f" (+{int(self.total_new_deaths):,d})"
+
+        message += f"\n{self.state}"
+        message += f"\nCases: {int(self.state_case_count):,d}"
+        message += f"\nDeaths: {int(self.state_death_count):,d}"
+
         if self.state_new_deaths != '0':
-            message += ' (+' + f"{int(self.state_new_deaths):,d}" + ')'
+            message += f" (+{int(self.state_new_deaths):,d})"
+
+        # If New York, add City for clarity
         if self.county == 'New York':
-            message += "\n" + self.county + " City"
+            message += "\nNew York City"
         else:
-            message += "\n" + self.county
-        message += "\nCases: " + f"{int(self.county_case_count):,d}"
-        message += "\nDeaths: " + f"{int(self.county_death_count):,d}"
+            message += f"\n{self.county}"
+
+        message += f"\nCases: {int(self.county_case_count):,d}"
+        message += f"\nDeaths: {int(self.county_death_count):,d}"
+
         if self.county_new_deaths != '0':
-            message += ' (+' + f"{int(self.county_new_deaths):,d}" + ')'
-        self.message = message
+            message += f" (+{int(self.county_new_deaths):,d})"
+        return message
+
 
     #  Sends client message
     def send_sms(self):
@@ -218,7 +233,6 @@ def main():
     for x in accounts:
         recipient = Account(*x)
         recipient.set_data(data, prior)
-        recipient.build_message()
         recipient.send_sms()
 
     data.to_csv('prior_data.csv', index=False)
