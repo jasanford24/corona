@@ -25,8 +25,7 @@ def collect_data():
     baby_driver.get('https://coronavirus.1point3acres.com/en')
 
     # Collect State Data
-    states = baby_driver.find_elements_by_xpath(
-        '//*[@id="map"]/div[2]/div[1]/div[5]')
+    states = baby_driver.find_elements_by_xpath('//*[@id="__next"]/div/div[7]')
     county_df = [
         x.strip().replace(',', '') for x in states[0].text.split('\n')
         if "+" not in x and "%" not in x
@@ -38,7 +37,7 @@ def collect_data():
             county_df = county_df[x:]
             break
 
-    header = baby_driver.find_elements_by_xpath('//*[@id="map"]/div[2]/div[1]/div[5]/header')
+    header = baby_driver.find_elements_by_xpath('//*[@id="__next"]/div/div[7]/header')
     header = header[0].text.split('\n')
 
     for x in range(0, len(header)):
@@ -61,12 +60,12 @@ def collect_data():
 
         # Clicks "Show More" button to show all county data
         element = baby_driver.find_element_by_xpath(
-            f'//*[@id="map"]/div[2]/div[1]/div[5]/div[{x}]/div[1]/span[1]')
+            f'//*[@id="__next"]/div/div[7]/div[{x}]/div/span[1]')
         baby_driver.execute_script("arguments[0].click();", element)
 
         # Collects county data and transforms it.
         states = baby_driver.find_elements_by_xpath(
-            f'//*[@id="map"]/div[2]/div[1]/div[5]/div[{x}]/div[2]')
+            f'//*[@id="__next"]/div/div[7]/div[{x}]/div[2]')
         county_df = [
             y.strip().replace(',', '') for y in states[0].text.split('\n')
             if "+" not in y and "%" not in y
