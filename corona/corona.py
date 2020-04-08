@@ -1,14 +1,14 @@
 #  Raspberry Pi 4B Version
 
-from pickle import dump, load
+from pickle import load
 from time import localtime, sleep
 
 import pandas as pd
-import requests
-from bs4 import BeautifulSoup
+import sqlite3
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from twilio.rest import Client
+from sqlalchemy import create_engine
 
 
 #  Collects data from:
@@ -222,20 +222,24 @@ def calculate_time():
 def main():
     sleep(calculate_time())
 
-    prior = pd.read_csv('prior_data.csv')
-
     data = collect_data()
 
-    with open('accounts.p', 'rb') as pfile:
-        accounts = load(pfile)
+    engine = create_engine('sqlite:///corona-database.db')
+    connection = engine.connect()
+
+    prior = pd.read_sql_table(table_name='cases', con=engine)
+    accounts = tuple(connection.execute("SELECT * FROM Accounts"))
 
     for x in accounts:
         recipient = Account(*x)
         recipient.set_data(data, prior)
         recipient.send_sms()
 
-    data.to_csv('prior_data.csv', index=False)
+    data.to_sql(name='cases', if_exists='replace', con=engine, index=False)
+    engine.dispose()
+
     main()
+
 
 if __name__ == "__main__":
     main()
