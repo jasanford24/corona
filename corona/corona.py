@@ -236,6 +236,8 @@ def main():
         recipient.send_sms()
 
     data.to_sql(name='cases', if_exists='replace', con=engine, index=False)
+    
+    connection.close()
     engine.dispose()
 
     main()
