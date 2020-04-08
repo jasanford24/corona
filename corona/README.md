@@ -7,8 +7,7 @@ sends out a text to a list of numbers.
 
 Requires Twilio account and additional files:
 
-<pre><code>prior_data.csv  -   Holds previous days collected data.
-accounts.p      -   List of numbers with local state ['+phone number', 'State', 'County']
-login.p         -   List of Twilio login credentials with personal number attached on the end
-                     for error handling. ['account_sid', 'auth_token', '+phone number']</code></pre>
+<pre><code>corona-database.db    -   Database with cases and accounts tables.
+login.p               -   List of Twilio login credentials with personal number attached on the end
+                           for error handling. ['account_sid', 'auth_token', '+phone number']</code></pre>
    
