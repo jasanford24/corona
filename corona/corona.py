@@ -4,7 +4,7 @@ from pickle import load
 from time import localtime, sleep
 
 import pandas as pd
-import sqlite3
+from multiprocessing import Pool
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from twilio.rest import Client
@@ -14,7 +14,7 @@ from sqlalchemy import create_engine
 #  Collects data from:
 #  https://coronavirus.1point3acres.com/en
 #  and stores it in a dataframe.
-def collect_data():
+def collect_data(_):
     options = Options()
     options.add_argument("--headless")
     options.add_argument("--incognito")
@@ -23,9 +23,10 @@ def collect_data():
     baby_driver = webdriver.Chrome(options=options,
                                    executable_path=driver_path)
     baby_driver.get('https://coronavirus.1point3acres.com/en')
+    xpath_base = '//*[@id="__next"]/div/div[8]'
 
     # Collect State Data
-    states = baby_driver.find_elements_by_xpath('//*[@id="__next"]/div/div[7]')
+    states = baby_driver.find_elements_by_xpath(xpath_base)
     county_df = [
         x.strip().replace(',', '') for x in states[0].text.split('\n')
         if "+" not in x and "%" not in x
@@ -37,11 +38,11 @@ def collect_data():
             county_df = county_df[x:]
             break
 
-    header = baby_driver.find_elements_by_xpath('//*[@id="__next"]/div/div[7]/header')
+    header = baby_driver.find_elements_by_xpath(xpath_base + '/header')
     header = header[0].text.split('\n')
 
     for x in range(0, len(header)):
-        if header[x].lower() == "fatality rate":
+        if header[x].lower() == "fatality rate" or header[x].lower() == "fatality":
             header.pop(x)
             break
     header_size = len(header)
@@ -60,12 +61,12 @@ def collect_data():
 
         # Clicks "Show More" button to show all county data
         element = baby_driver.find_element_by_xpath(
-            f'//*[@id="__next"]/div/div[7]/div[{x}]/div/span[1]')
+            f'{xpath_base}/div[{x}]/div/span[1]')
         baby_driver.execute_script("arguments[0].click();", element)
 
         # Collects county data and transforms it.
         states = baby_driver.find_elements_by_xpath(
-            f'//*[@id="__next"]/div/div[7]/div[{x}]/div[2]')
+            f'{xpath_base}/div[{x}]/div[2]')
         county_df = [
             y.strip().replace(',', '') for y in states[0].text.split('\n')
             if "+" not in y and "%" not in y
@@ -74,19 +75,19 @@ def collect_data():
             [county_df[y:y + header_size:] for y in range(0, len(county_df), header_size)],
             columns=['county', 'county_cases', 'county_deaths', 'county_recovered'])
         temp_data['state'] = state_data['Location'][x - 2]
-        temp_data['state_cases'] = state_data['Confirmed'][x - 2]
+        temp_data['state_cases'] = state_data['Cases'][x - 2]
         temp_data['state_deaths'] = state_data['Deaths'][x - 2]
         temp_data['state_recovered'] = state_data['Recovered'][x - 2]
         data = data.append(temp_data)
 
     baby_driver.close()
 
-    return data.append(add_bay_area(data), ignore_index=True)
+    return data
 
 
 # Prior collection does not combine the bay area into one like it does with New York City
 # So added this so San Francisco can have a Bay Area count.
-def bay_area_collection():
+def bay_area_collection(_):
     options = Options()
     options.add_argument("--headless")
     options.add_argument("--incognito")
@@ -108,12 +109,11 @@ def bay_area_collection():
 
 
 # Adds Bay Area data to data dataframe
-def add_bay_area(data):
-    test = bay_area_collection()
+def add_bay_area(data, bay_area):
     temp = data[data['county'] == 'San Francisco'].reset_index(drop=True)
     temp['county'] = 'Bay Area'
-    temp['county_cases'] = test[0]
-    temp['county_deaths'] = test[1]
+    temp['county_cases'] = bay_area[0]
+    temp['county_deaths'] = bay_area[1]
     return temp
 
 
@@ -206,7 +206,7 @@ class Account:
 
 # Used to set activiation time to 8pmEST
 def calculate_time():
-    eight = 20 * 60 * 60
+    eight = 20 * 60 * 59  #7:59pm
 
     day = 24 * 60 * 60
     hour = (60 * 60) * localtime()[3]
@@ -222,7 +222,16 @@ def calculate_time():
 def main():
     sleep(calculate_time())
 
-    data = collect_data()
+    p = Pool()
+    data = p.map_async(collect_data, [1])
+    bay = p.map_async(bay_area_collection, [1])
+    p.close()
+    p.join()
+
+    data = data.get()[0].reset_index(drop=True)
+    bay_area = bay.get()[0]
+
+    data = data.append(add_bay_area(data, bay_area), ignore_index=True)
 
     engine = create_engine('sqlite:///corona-database.db')
     connection = engine.connect()
@@ -236,7 +245,7 @@ def main():
         recipient.send_sms()
 
     data.to_sql(name='cases', if_exists='replace', con=engine, index=False)
-    
+
     connection.close()
     engine.dispose()
 
