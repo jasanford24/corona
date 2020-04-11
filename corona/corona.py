@@ -80,7 +80,7 @@ def collect_data(_):
         temp_data['state_recovered'] = state_data['Recovered'][x - 2]
         data = data.append(temp_data)
 
-    baby_driver.close()
+    baby_driver.quit()
 
     return data
 
@@ -104,7 +104,7 @@ def bay_area_collection(_):
     bay_temp = list(
         map(lambda x: x.replace(',', ''), states[0].text.split('\n')[1::2]))
 
-    baby_driver.close()
+    baby_driver.quit()
     return bay_temp
 
 
@@ -206,7 +206,7 @@ class Account:
 
 # Used to set activiation time to 8pmEST
 def calculate_time():
-    eight = 20 * 60 * 59  #7:59pm
+    eight = (20 * 60 * 59) - 60  #7:59pm
 
     day = 24 * 60 * 60
     hour = (60 * 60) * localtime()[3]
