@@ -1,6 +1,5 @@
 #  Raspberry Pi 4B Version
 
-from os import environ
 import logging
 from multiprocessing import Pool
 from time import localtime, sleep
@@ -9,7 +8,6 @@ import pandas as pd
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from sqlalchemy import create_engine
-from twilio.rest import Client
 from corona_accounts import Account
 
 logging.basicConfig(filename='corona.log',
@@ -138,7 +136,7 @@ def add_bay_area(data, bay_area):
 
 # Used to set activiation time to 8pmEST
 def calculate_time():
-    eight = (20 * 60 * 60) - 60  #7:58pm
+    eight = (20 * 60 * 60)
 
     day = 24 * 60 * 60
     hour = (60 * 60) * localtime()[3]
@@ -153,8 +151,11 @@ def calculate_time():
 
 def main():
     # Sleeps progrm until 7:58pmEST
-    logging.info("Beginning sleep.")
-    sleep(calculate_time())
+    logging.info("Beginning sleep till 7:58")
+    seven = calculate_time()-120
+    # if time is between 7:58 and 8 then skip sleep
+    if seven > 0:
+        sleep(seven) #7:58
 
     # Splits website collection into two processes to run simultaniously
     logging.info("Beginning multipooling.")
@@ -171,6 +172,9 @@ def main():
     # Appends bay area data to bottom of main data.
     logging.info("Appending data.")
     data = data.append(add_bay_area(data, bay_area), ignore_index=True)
+
+    logging.info("Beginning sleep till 8.")
+    sleep(calculate_time())
 
     # Opens database to retrieve prior data and account information.
     logging.info("Starting database engine.")
