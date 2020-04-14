@@ -1,3 +1,6 @@
+from pickle import load
+from twilio.rest import Client
+
 #  Practicing Object Programming.
 #  Makes an object for each client and prepares their data for delivery
 class Account:
@@ -75,8 +78,16 @@ class Account:
     
     #  Sends client message
     def send_sms(self):
-        twilioCli = Client(environ.get("TWILIO_USER"), environ.get("TWILIO_PASS"))
+        with open('login.p', 'rb') as pfile:
+            logins = load(pfile)
 
+        twilioCli = Client(logins[0], logins[1])
+        
         twilioCli.messages.create(body=self.message,
-                                  from_=environ.get("TWILIO_NUMBER"),
+                                  from_=logins[2],
                                   to=self.number)
+    
+    #  Prints client message for testing
+    def print_sms(self):
+        print(self.message)
+        print()
