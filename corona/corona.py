@@ -3,6 +3,7 @@
 import logging
 from multiprocessing import Pool
 from time import localtime, sleep
+from datetime import date, timedelta
 
 import pandas as pd
 from selenium import webdriver
@@ -36,7 +37,7 @@ def collect_data(_):
     states = baby_driver.find_elements_by_xpath(xpath_base)
     state_df = [
         x.strip().replace(',', '') for x in states[0].text.split('\n')
-        if "+" not in x and "%" not in x
+        if x[0] != '+' and x[0] != '-' and x[-1] != '%'
     ]
 
     #  Starts collection when it reads "New York" the first state on the list.
@@ -75,7 +76,7 @@ def collect_data(_):
             f'{xpath_base}/div[{x}]/div[2]')
         county_df = [
             y.strip().replace(',', '') for y in states[0].text.split('\n')
-            if "+" not in y and "%" not in y
+            if y[0] != '+' and y[0] != '-' and y[-1] != '%'
         ]
 
         # Close county data to increase performance
@@ -172,6 +173,7 @@ def main():
     # Appends bay area data to bottom of main data.
     logging.info("Appending data.")
     data = data.append(add_bay_area(data, bay_area), ignore_index=True)
+    data['date'] = date.today()
 
     logging.info("Beginning sleep till 8.")
     sleep(calculate_time())
@@ -179,11 +181,14 @@ def main():
     # Opens database to retrieve prior data and account information.
     logging.info("Starting database engine.")
     engine = create_engine('sqlite:///corona-database.db')
-    connection = engine.connect()
+    with engine.connect() as connection:
+        accounts = tuple(connection.execute("SELECT * FROM Accounts"))
 
-    #  Reads prior data and account data
-    prior = pd.read_sql_table(table_name='cases', con=engine)
-    accounts = tuple(connection.execute("SELECT * FROM Accounts"))
+    # Read only prior day data from database
+    yesterdate = (date.today() - timedelta(1)).strftime("%Y-%m-%d")
+    sql = f"SELECT * FROM cases WHERE date='{yesterdate}'"
+    prior = pd.read_sql_query(sql, con=engine)
+
 
     # Loops through accounts one by one storing relevant data.
     logging.info("Beginning creation of individual data.")
@@ -194,7 +199,7 @@ def main():
         recipient.send_sms()
 
     # Stores new data, overwriting previous data.
-    data.to_sql(name='cases', if_exists='replace', con=engine, index=False)
+    data.to_sql(name='cases', if_exists='append', con=engine, index=False)
 
     # Closes database connections.
     connection.close()
