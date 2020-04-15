@@ -173,7 +173,7 @@ def main():
     # Appends bay area data to bottom of main data.
     logging.info("Appending data.")
     data = data.append(add_bay_area(data, bay_area), ignore_index=True)
-    data['date'] = date.today()
+    data['date'] = date.today().strftime("%Y-%m-%d")
 
     logging.info("Beginning sleep till 8.")
     sleep(calculate_time())
