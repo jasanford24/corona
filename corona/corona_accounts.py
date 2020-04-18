@@ -1,20 +1,15 @@
-#  Practicing Object Programming.
-#  Makes an object for each client and prepares their data for delivery
+from os import environ
+from twilio.rest import Client
+
+twilioCli = Client(environ.get('TWILIO_USER'),
+                   environ.get('TWILIO_PASS'))
+
+
 class Account:
     def __init__(self, number, state, county):
         self.number = number
         self.state = state
         self.county = county
-        self.message = ''
-        self.total_cases = '0'
-        self.total_deaths = '0'
-        self.total_new_deaths = '0'
-        self.state_case_count = '0'
-        self.state_death_count = '0'
-        self.state_new_deaths = '0'
-        self.county_case_count = '0'
-        self.county_death_count = '0'
-        self.county_new_deaths = '0'
 
     #  Sets individual client data
     def set_data(self, data, prior):
@@ -41,42 +36,47 @@ class Account:
         self.county_death_count = current_data['county_deaths'][0]
         self.county_new_deaths = str(
             int(self.county_death_count) - int(prior_data['county_deaths'][0]))
-        self.message = self.build_message()
+        self.build_message()
 
-    #  Builds personalized client message
     def build_message(self):
         message = 'US Covid-19'
-        message += f"\nCases: {int(self.total_cases):,}"
-        message += f"\nDeaths: {int(self.total_deaths):,}"
+        message += f'\nCases: {int(self.total_cases):,}'
+        message += f'\nDeaths: {int(self.total_deaths):,}'
 
         if self.total_new_deaths != '0':
-            message += f" (+{int(self.total_new_deaths):,})"
+            message += f' (+{int(self.total_new_deaths):,})'
 
-        message += f"\n{self.state}"
-        message += f"\nCases: {int(self.state_case_count):,}"
-        message += f"\nDeaths: {int(self.state_death_count):,}"
+        message += f'\n{self.state}'
+        message += f'\nCases: {int(self.state_case_count):,}'
+        message += f'\nDeaths: {int(self.state_death_count):,}'
 
         if self.state_new_deaths != '0':
-            message += f" (+{int(self.state_new_deaths):,})"
+            message += f' (+{int(self.state_new_deaths):,})'
 
         # If New York, add City for clarity
         if self.county == 'New York':
-            message += "\nNew York City"
+            message += '\nNew York City'
         else:
-            message += f"\n{self.county}"
+            message += f'\n{self.county}'
 
-        message += f"\nCases: {int(self.county_case_count):,}"
-        message += f"\nDeaths: {int(self.county_death_count):,}"
+        message += f'\nCases: {int(self.county_case_count):,}'
+        message += f'\nDeaths: {int(self.county_death_count):,}'
 
         if self.county_new_deaths != '0':
-            message += f" (+{int(self.county_new_deaths):,})"
-        return message
-
+            message += f' (+{int(self.county_new_deaths):,})'
+        self.message = message
 
     #  Sends client message
     def send_sms(self):
-        twilioCli = Client(environ.get("TWILIO_USER"), environ.get("TWILIO_PASS"))
-
         twilioCli.messages.create(body=self.message,
-                                  from_=environ.get("TWILIO_NUMBER"),
+                                  from_=environ.get('TWILIO_NUMBER'),
                                   to=self.number)
+
+    def __repr__(self):
+        return self.message + '\n'
+
+
+def emergency(error):
+    twilioCli.messages.create(body=error,
+                              from_=environ.get('TWILIO_NUMBER'),
+                              to=environ.get('MY_NUMBER'))
