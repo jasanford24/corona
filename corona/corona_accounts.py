@@ -3,6 +3,8 @@ from twilio.rest import Client
 
 twilioCli = Client(environ.get('TWILIO_USER'),
                    environ.get('TWILIO_PASS'))
+TWIL_NUMB = environ.get('TWILIO_NUMBER')
+MY_NUMB = environ.get('MY_NUMBER')
 
 
 class Account:
@@ -69,7 +71,7 @@ class Account:
     #  Sends client message
     def send_sms(self):
         twilioCli.messages.create(body=self.message,
-                                  from_=environ.get('TWILIO_NUMBER'),
+                                  from_=TWIL_NUMB,
                                   to=self.number)
 
     def __repr__(self):
@@ -78,5 +80,5 @@ class Account:
 
 def emergency(error):
     twilioCli.messages.create(body=error,
-                              from_=environ.get('TWILIO_NUMBER'),
-                              to=environ.get('MY_NUMBER'))
+                              from_=TWIL_NUMB,
+                              to=MY_NUMB)
