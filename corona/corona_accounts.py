@@ -22,23 +22,20 @@ class Account:
                            & (prior['county'] == self.county)].reset_index(
                                drop=True)
 
-        self.total_cases = sum([int(x) for x in data['county_cases'][:-1]])
-        self.total_deaths = sum([int(x) for x in data['county_deaths'][:-1]])
-        self.total_new_deaths = int(
-            self.total_deaths) - sum(
-            [int(x) for x in prior['county_deaths'][:-1]])
+        self.total_cases = data['county_cases'][:-1].sum()
+        self.total_deaths = data['county_deaths'][:-1].sum()
+        self.total_new_deaths = self.total_deaths - \
+            prior['county_deaths'][:-1].sum()
 
         self.state_case_count = current_data['state_cases'][0]
         self.state_death_count = current_data['state_deaths'][0]
-        self.state_new_deaths = int(
-            self.state_death_count) - int(
-            prior_data['state_deaths'][0])
+        self.state_new_deaths = self.state_death_count - \
+            prior_data['state_deaths'][0]
 
         self.county_case_count = current_data['county_cases'][0]
         self.county_death_count = current_data['county_deaths'][0]
-        self.county_new_deaths = int(
-            self.county_death_count) - int(
-            prior_data['county_deaths'][0])
+        self.county_new_deaths = self.county_death_count - \
+            prior_data['county_deaths'][0]
         self.build_message()
 
     def build_message(self):
